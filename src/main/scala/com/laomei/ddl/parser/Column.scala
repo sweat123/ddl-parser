@@ -5,45 +5,47 @@ package com.laomei.ddl.parser
   *
   * @author laomei on 2018/11/3 14:37
   */
-trait Column {
+class Column {
 
-  /**
-    * column name
-    */
-  def name: String
+  var name: String = _
 
   /**
     * jdbc type
     */
-  def jdbcType: Int
+  var jdbcType: Int = null
 
   /**
     * jdbc type name
     */
-  def jdbcTypeName: String
+  var jdbcTypeName: String= _
 
   /**
     * scala type
     */
-  def scalaType: Int
+  var scalaType: Int = null
 
   /**
     * the length of current column
     */
-  def length: Int
+  var length: Int = -1
 
   /**
     * current column allow null or not
     */
-  def isOptional: Boolean
+  var isOptional: Boolean = null
+
+  /**
+    * auto increment or not
+    */
+  var isAutoIncremented: Boolean = null
 
   /**
     * Determine whether current column has a default value
     */
-  def hasDefaultValue: Boolean
+  var hasDefaultValue: Boolean = null
 
   /**
     * Get the default value current column
     */
-  def defaultValue: scala.Any
+  var defaultValue: Any = null
 }
