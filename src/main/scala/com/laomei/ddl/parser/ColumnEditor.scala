@@ -3,43 +3,89 @@ package com.laomei.ddl.parser
 /**
   * @author laomei on 2018/11/6 22:41
   */
-trait ColumnEditor {
+class ColumnEditor {
 
-  def name: String
+  var name: String = _
 
-  def jdbcType: Int
+  var jdbcType: Int = _
 
-  def jdbcTypeName: String
+  var jdbcTypeName: String = _
 
-  def scalaType: Int
+  var scalaType: Int = _
 
-  def length: Int
+  var length: Int = _
 
-  def isOptional: Boolean
+  var scale: Int = _
 
-  def isAutoIncremented: Boolean
+  var isOptional: Boolean = true
 
-  def hasDefaultValue: Boolean
+  var isAutoIncremented: Boolean = false
 
-  def defaultValue: Any
+  var hasDefaultValue: Boolean = false
 
-  def name(name: String): ColumnEditor
+  var defaultValue: Any = null
 
-  def jdbcType(jdbcType: Int): ColumnEditor
+  def name(name: String): ColumnEditor = {
+    this.name = name
+    this
+  }
 
-  def jdbcTypeTypeName(jdbcType: String): ColumnEditor
+  def jdbcType(jdbcType: Int): ColumnEditor = {
+    this.jdbcType = jdbcType
+    this
+  }
 
-  def scalaType(scalaType: Int): ColumnEditor
+  def jdbcTypeName(jdbcTypeName: String): ColumnEditor = {
+    this.jdbcTypeName = jdbcTypeName
+    this
+  }
 
-  def length(length: Int): ColumnEditor
+  def scalaType(scalaType: Int): ColumnEditor = {
+    this.scalaType = scalaType
+    this
+  }
 
-  def isOptional(isOptional: Boolean): ColumnEditor
+  def length(length: Int): ColumnEditor = {
+    this.length = length
+    this
+  }
 
-  def isAutoIncremented(isAutoIncremented: Boolean): ColumnEditor
+  def scale(scale: Int): ColumnEditor = {
+    this.scale = scale
+    this
+  }
 
-  def hasDefaultValue(hasDefaultValue: Boolean): ColumnEditor
+  def isOptional(isOptional: Boolean): ColumnEditor = {
+    this.isOptional = isOptional
+    if (isOptional && !hasDefaultValue) {
+      defaultValue = null
+    }
+    this
+  }
 
-  def defaultValue(defaultValue: Any): ColumnEditor
+  def isAutoIncremented(isAutoIncremented: Boolean): ColumnEditor = {
+    this.isAutoIncremented = isAutoIncremented
+    this
+  }
 
-  def create: Column
+  def defaultValue(defaultValue: Any): ColumnEditor = {
+    this.defaultValue = defaultValue
+    this.hasDefaultValue = true
+    this
+  }
+
+  def create: Column = {
+    new Column(
+      name,
+      jdbcType,
+      jdbcTypeName,
+      scalaType,
+      length,
+      scale,
+      isOptional,
+      isAutoIncremented,
+      hasDefaultValue,
+      defaultValue
+    )
+  }
 }
