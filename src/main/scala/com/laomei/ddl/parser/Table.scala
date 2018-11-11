@@ -18,8 +18,11 @@ class Table(
   }
 
   def editor: TableEditor = {
-    //todo: return table editor
-    null
+    val editor = new TableEditor
+    editor.schemaName = schemaName
+    editor.tableName = tableName
+    editor.addColumns(columns.toList)
+    editor
   }
 
   private def getColumnsByName: util.Map[String, Column] = {
@@ -31,8 +34,6 @@ class Table(
 object Table {
 
   def newEditor: TableEditor = {
-
-    //todo return a new table editor
-    null
+    new TableEditor
   }
 }
