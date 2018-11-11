@@ -1,17 +1,16 @@
 package com.laomei.ddl.parser
 
 import java.util
-import scala.collection.mutable.ListBuffer
 
 /**
   * @author laomei on 2018/11/11 21:14
   */
-class Schema(val schemaName: String) {
+class Tables(val schemaName: String) {
 
   private val tables: util.Map[String, Table] = new util.HashMap[String, Table]()
 
   @throws[IllegalStateException]("if the current schema is not same as giving table's")
-  def addTable(table: Table): Schema = {
+  def addTable(table: Table): Tables = {
     if (this.schemaName != table.schemaName) {
       throw new IllegalStateException("current schema is not same as giving table schema")
     }
@@ -19,7 +18,7 @@ class Schema(val schemaName: String) {
     this
   }
 
-  def addTables(tables: List[Table]): Schema = {
+  def addTables(tables: List[Table]): Tables = {
     tables.foreach(addTable)
     this
   }

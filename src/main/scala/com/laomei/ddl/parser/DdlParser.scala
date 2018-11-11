@@ -9,8 +9,14 @@ class DdlParser {
 
   val logger: Logger = LoggerFactory.getLogger(getClass)
 
+  /**
+    * parse ddl
+    */
+  def parse(sql: String, tables: Tables): Unit = {
 
-  def parse(sql: String): Unit = {
+  }
+
+  def parseDataDefinitionStatement(sql: String, tables: Tables): Unit = {
 
   }
 }
