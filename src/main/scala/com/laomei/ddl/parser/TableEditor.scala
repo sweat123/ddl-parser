@@ -5,11 +5,7 @@ import java.util
 /**
   * @author laomei on 2018/11/8 22:55
   */
-class TableEditor {
-
-  var schemaName: String = _
-
-  var tableName: String = _
+class Table(val tableName: String) {
 
   private val sortedColumns: util.Map[String, Column] = new util.LinkedHashMap[String, Column]
 
@@ -30,19 +26,13 @@ class TableEditor {
     columns.map(_.name)
   }
 
-  def addColumn(column: Column): TableEditor = {
+  def addColumn(column: Column): Table = {
     sortedColumns.put(column.name.toLowerCase, column)
     this
   }
 
-  def addColumns(columns: List[Column]): TableEditor = {
+  def addColumns(columns: List[Column]): Table = {
     columns.foreach(addColumn)
     this
-  }
-
-  def create: Table = {
-    import scala.collection.JavaConverters._
-    val columns = sortedColumns.values().asScala.toList
-    new Table(schemaName, tableName, columns)
   }
 }
