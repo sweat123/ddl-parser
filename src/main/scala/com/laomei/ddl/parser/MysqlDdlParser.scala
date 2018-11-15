@@ -70,13 +70,48 @@ class MysqlDdlParser {
       stream.consume("NOT")
       stream.consume("EXIST")
     }
-    val tableName = stream.consume()
+    var tableName = stream.consume()
+    if (stream.canConsume(".")) {
+      stream.consume(".")
+      tableName = stream.consume()
+    }
     val table = new Table(tableName)
     tables.addTable(table)
     parseCreateContent(table)
   }
 
   private def parseCreateContent(table: Table): Unit = {
+    stream.consume("(")
+    parseColumnCreateDefinition(table)
+    while (stream.canConsume(",")) {
+      stream.consume(",")
+      parseColumnCreateDefinition(table)
+    }
+    stream.consume(")")
+  }
+
+  private def parseColumnCreateDefinition(table: Table): Unit = {
+    val columnName = stream.consume()
+    val jdbcType = stream.consume()
+    var length: Int = 0
+    if (stream.canConsume("(")) {
+      stream.consume("(")
+      length = stream.consume().toInt
+      stream.consume(")")
+    }
+    var optional: Boolean = true
+    if (stream.canConsume("NULL")) {
+      stream.consume("NULL")
+    } else if (stream.canConsume("NOT")) {
+      stream.consume("NOT")
+      stream.consume("NULL")
+      optional = false
+    }
+    var isAutoIncrement: Boolean = false
+    if (stream.canConsume("AUTO_INCREMENT")) {
+      stream.consume("AUTO_INCREMENT")
+      isAutoIncrement = true
+    }
 
   }
 }
