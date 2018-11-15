@@ -99,6 +99,14 @@ class MysqlDdlParser {
       length = stream.consume().toInt
       stream.consume(")")
     }
+
+    if (stream.canConsume("CONSTRAINT")) {
+      stream.consume("CONSTRAINT")
+      //symbol
+      stream.consume()
+      
+    }
+
     var optional: Boolean = true
     if (stream.canConsume("NULL")) {
       stream.consume("NULL")
@@ -107,11 +115,17 @@ class MysqlDdlParser {
       stream.consume("NULL")
       optional = false
     }
+    var hasDefaultValue: Boolean = false
+    var defaultValue: String = _
+    if (stream.canConsume("DEFAULT")) {
+      stream.consume("DEFAULT")
+      defaultValue = stream.consume()
+      hasDefaultValue = true
+    }
     var isAutoIncrement: Boolean = false
     if (stream.canConsume("AUTO_INCREMENT")) {
       stream.consume("AUTO_INCREMENT")
       isAutoIncrement = true
     }
-    
   }
 }
