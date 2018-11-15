@@ -113,5 +113,6 @@ class MysqlDdlParser {
       isAutoIncrement = true
     }
 
+    
   }
 }
