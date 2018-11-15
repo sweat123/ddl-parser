@@ -9,9 +9,7 @@ class Column(
             val name: String,
             val jdbcType: Int,
             val jdbcTypeName: String,
-            val scalaType: Int,
             val length: Int,
-            val scale: Int = 0,
             val isOptional: Boolean,
             val isAutoIncremented: Boolean,
             val hasDefaultValue: Boolean,
@@ -23,9 +21,7 @@ class Column(
         .name(name)
         .jdbcType(jdbcType)
         .jdbcTypeName(jdbcTypeName)
-        .scalaType(scalaType)
         .length(length)
-        .scale(scale)
         .isOptional(isOptional)
         .isAutoIncremented(isAutoIncremented)
     if (hasDefaultValue) {
@@ -43,9 +39,7 @@ class Column(
         this.name.equalsIgnoreCase(that.name)&&
           this.jdbcType.equals(that.jdbcType)&&
           this.jdbcTypeName.equalsIgnoreCase(that.jdbcTypeName)&&
-          this.scalaType.equals(that.scalaType)&&
           this.length.equals(that.length)&&
-          this.scale.equals(that.scale)&&
           this.isOptional.equals(that.isOptional)&&
           this.isAutoIncremented.equals(that.isAutoIncremented)&&
           this.hasDefaultValue.equals(that.hasDefaultValue)&&
@@ -59,9 +53,6 @@ class Column(
     sb.append(" ").append(jdbcTypeName)
     if (length >= 0) {
       sb.append('(').append(length)
-      if (scale != null) {
-        sb.append(", ").append(scale)
-      }
       sb.append(')')
     }
     if (!isOptional) sb.append(" NOT NULL")

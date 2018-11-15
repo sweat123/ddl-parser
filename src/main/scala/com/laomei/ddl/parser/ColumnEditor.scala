@@ -11,8 +11,6 @@ class ColumnEditor {
 
   var jdbcTypeName: String = _
 
-  var scalaType: Int = _
-
   var length: Int = _
 
   var scale: Int = _
@@ -37,11 +35,6 @@ class ColumnEditor {
 
   def jdbcTypeName(jdbcTypeName: String): ColumnEditor = {
     this.jdbcTypeName = jdbcTypeName
-    this
-  }
-
-  def scalaType(scalaType: Int): ColumnEditor = {
-    this.scalaType = scalaType
     this
   }
 
@@ -79,7 +72,6 @@ class ColumnEditor {
       name,
       jdbcType,
       jdbcTypeName,
-      scalaType,
       length,
       scale,
       isOptional,
