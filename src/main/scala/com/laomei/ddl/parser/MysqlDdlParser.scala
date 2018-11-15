@@ -112,7 +112,6 @@ class MysqlDdlParser {
       stream.consume("AUTO_INCREMENT")
       isAutoIncrement = true
     }
-
     
   }
 }
