@@ -9,11 +9,7 @@ class Tables(val schemaName: String) {
 
   private val tables: util.Map[String, Table] = new util.HashMap[String, Table]()
 
-  @throws[IllegalStateException]("if the current schema is not same as giving table's")
   def addTable(table: Table): Tables = {
-    if (this.schemaName != table.schemaName) {
-      throw new IllegalStateException("current schema is not same as giving table schema")
-    }
     tables.put(table.tableName.toLowerCase, table)
     this
   }

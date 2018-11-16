@@ -11,8 +11,6 @@ class MysqlDdlParser {
 
   var stream: MysqlTokenStream = _
 
-  var currentToken: Token = _
-
   var tables: Tables = _
 
   /**
@@ -21,9 +19,6 @@ class MysqlDdlParser {
   def parse(sql: String, tables: Tables): Unit = {
     this.tables = tables
     stream = new MysqlTokenStream(sql)
-    if (!stream.hasNext) {
-      return
-    }
     parse()
   }
 
@@ -70,10 +65,10 @@ class MysqlDdlParser {
       stream.consume("NOT")
       stream.consume("EXIST")
     }
-    var tableName = stream.consume()
+    var tableName = stream.consume
     if (stream.canConsume(".")) {
       stream.consume(".")
-      tableName = stream.consume()
+      tableName = stream.consume
     }
     val table = new Table(tableName)
     tables.addTable(table)
@@ -91,19 +86,19 @@ class MysqlDdlParser {
   }
 
   private def parseColumnCreateDefinition(table: Table): Unit = {
-    val columnName = stream.consume()
-    val jdbcType = stream.consume()
+    val columnName = stream.consume
+    val jdbcType = stream.consume
     var length: Int = 0
     if (stream.canConsume("(")) {
       stream.consume("(")
-      length = stream.consume().toInt
+      length = stream.consume.toInt
       stream.consume(")")
     }
 
     if (stream.canConsume("CONSTRAINT")) {
       stream.consume("CONSTRAINT")
       //symbol
-      stream.consume()
+      stream.consume
       
     }
 
@@ -119,7 +114,7 @@ class MysqlDdlParser {
     var defaultValue: String = _
     if (stream.canConsume("DEFAULT")) {
       stream.consume("DEFAULT")
-      defaultValue = stream.consume()
+      defaultValue = stream.consume
       hasDefaultValue = true
     }
     var isAutoIncrement: Boolean = false
