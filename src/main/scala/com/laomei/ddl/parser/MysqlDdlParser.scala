@@ -97,9 +97,20 @@ class MysqlDdlParser {
 
     if (stream.canConsume("CONSTRAINT")) {
       stream.consume("CONSTRAINT")
-      //symbol
+      //symbol, ignore this
       stream.consume
-      
+    }
+
+    var isPk = false
+    /* index */
+    if (stream.canConsume("PRIMARY")) {
+      stream.consume("PRIMARY")
+      stream.consume("KEY")
+      isPk = true
+    } else if (stream.canConsume("FOREIGN")) {
+      // only ignore these
+      stream.consume("FOREIGN")
+      stream.consume("KEY")
     }
 
     var optional: Boolean = true
