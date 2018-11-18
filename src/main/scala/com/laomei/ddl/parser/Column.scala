@@ -1,33 +1,70 @@
 package com.laomei.ddl.parser
 
 /**
-  * A definition of a column
-  *
-  * @author laomei on 2018/11/3 14:37
+  * @author laomei on 2018/11/6 22:41
   */
-class Column(
-            val name: String,
-            val jdbcType: Int,
-            val jdbcTypeName: String,
-            val length: Int,
-            val isOptional: Boolean,
-            val isAutoIncremented: Boolean,
-            val hasDefaultValue: Boolean,
-            val defaultValue: Any
-            ) {
+class Column {
 
-  def edit: ColumnEditor = {
-    val editor: ColumnEditor = Column.newEditor
-        .name(name)
-        .jdbcType(jdbcType)
-        .jdbcTypeName(jdbcTypeName)
-        .length(length)
-        .isOptional(isOptional)
-        .isAutoIncremented(isAutoIncremented)
-    if (hasDefaultValue) {
-      editor.defaultValue(defaultValue)
+  var name: String = _
+
+  var jdbcType: Int = _
+
+  var jdbcTypeName: String = _
+
+  var length: Int = _
+
+  var isPk: Boolean = false
+
+  var isOptional: Boolean = true
+
+  var isAutoIncremented: Boolean = false
+
+  var hasDefaultValue: Boolean = false
+
+  var defaultValue: Any = null
+
+  def name(name: String): Column = {
+    this.name = name
+    this
+  }
+
+  def jdbcType(jdbcType: Int): Column = {
+    this.jdbcType = jdbcType
+    this
+  }
+
+  def jdbcTypeName(jdbcTypeName: String): Column = {
+    this.jdbcTypeName = jdbcTypeName
+    this
+  }
+
+  def length(length: Int): Column = {
+    this.length = length
+    this
+  }
+
+  def isPk(isPk: Boolean): Column = {
+    this.isPk = isPk
+    this
+  }
+
+  def isOptional(isOptional: Boolean): Column = {
+    this.isOptional = isOptional
+    if (isOptional && !hasDefaultValue) {
+      defaultValue = null
     }
-    editor
+    this
+  }
+
+  def isAutoIncremented(isAutoIncremented: Boolean): Column = {
+    this.isAutoIncremented = isAutoIncremented
+    this
+  }
+
+  def defaultValue(defaultValue: Any): Column = {
+    this.defaultValue = defaultValue
+    this.hasDefaultValue = true
+    this
   }
 
   override def equals(obj: scala.Any): Boolean = {
@@ -40,6 +77,7 @@ class Column(
           this.jdbcType.equals(that.jdbcType)&&
           this.jdbcTypeName.equalsIgnoreCase(that.jdbcTypeName)&&
           this.length.equals(that.length)&&
+          this.isPk.equals(that.isPk)&&
           this.isOptional.equals(that.isOptional)&&
           this.isAutoIncremented.equals(that.isAutoIncremented)&&
           this.hasDefaultValue.equals(that.hasDefaultValue)&&
@@ -62,13 +100,9 @@ class Column(
     } else if (defaultValue != null) {
       sb.append(" DEFAULT VALUE ").append(defaultValue)
     }
+    if (isPk) {
+      sb.append(" PRIMARY KEY")
+    }
     sb.toString()
-  }
-}
-
-object Column {
-
-  def newEditor: ColumnEditor = {
-    new ColumnEditor
   }
 }

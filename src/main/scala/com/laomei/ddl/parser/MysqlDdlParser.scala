@@ -1,6 +1,7 @@
 package com.laomei.ddl.parser
 
 import org.slf4j.{Logger, LoggerFactory}
+import scala.util.control.Breaks._
 
 /**
   * @author laomei on 2018/11/3 13:53
@@ -77,16 +78,150 @@ class MysqlDdlParser {
 
   private def parseCreateContent(table: Table): Unit = {
     stream.consume("(")
-    parseColumnCreateDefinition(table)
+    parseColumnDefinition(table)
     while (stream.canConsume(",")) {
       stream.consume(",")
-      parseColumnCreateDefinition(table)
+      parseColumnDefinition(table)
     }
     stream.consume(")")
   }
 
-  private def parseColumnCreateDefinition(table: Table): Unit = {
-    val columnName = stream.consume
+  private def parseColumnDefinition(table: Table): Unit = {
+    stream.consume match {
+      case "PRIMARY"    => parsePrimaryKey(table)
+      case "FOREIGN"    => parseForeignKey(table)
+      case "INDEX"      => parseIndex()
+      case "KEY"        => parseIndex()
+      case "UNIQUE"     => parseUniqueIndex(table)
+      case "CONSTRAINT" => parseConstraint(table)
+      case "SPATIAL"    => parseSpatialOrFullText(table)
+      case "FULLTEXT"   => parseSpatialOrFullText(table)
+      case "CHECK"      => parseCheck(table)
+      case default      => parseColumnCreateDefinition(default, table)
+    }
+  }
+
+  private def parseSpatialOrFullText(table: Table): Unit = {
+    stream.consume match {
+      case "INDEX" => parseIndex()
+      case "KEY"   => parseIndex()
+    }
+  }
+
+  /**
+    * maybe parse failed
+    */
+  private def parseCheck(table: Table): Unit = {
+    stream.consume("(")
+    stream.consume
+    stream.consume(")")
+  }
+
+  private def parseConstraint(table: Table): Unit = {
+    stream.consume match {
+      case "PRIMARY" => parsePrimaryKey(table)
+      case "UNIQUE"  => parseUniqueIndex(table)
+      case "FOREIGN" => parseForeignKey(table)
+    }
+  }
+
+  private def parseUniqueIndex(table: Table): Unit = {
+    if (stream.canConsume("INDEX") || stream.canConsume("KEY")) {
+      stream.consume
+    }
+    parseIndex()
+  }
+
+  private def parseIndex(): Unit = {
+    stream.consume //index name
+    if (stream.canConsume("USING")) {
+      stream.consume("USING")
+      stream.consume
+    }
+    stream.consume("(")
+    parseKeyPart()
+    while (stream.canConsume(",")) {
+      stream.consume
+      parseKeyPart()
+    }
+    stream.consume(")")
+    parseIndexOption()
+  }
+
+  private def parseForeignKey(table: Table): Unit = {
+    stream.consume("KEY")
+    if (!stream.canConsume("(")) {
+      stream.consume  //index name
+    }
+    stream.consume("(")
+    stream.consume
+    while (stream.canConsume(",")) {
+      stream.consume(",")
+      stream.consume
+    }
+    stream.consume(")")
+    stream.consume("REFERENCES")
+    stream.consume
+    stream.consume("(")
+    parseKeyPart()
+    while (stream.canConsume(",")) {
+      stream.consume
+      parseKeyPart()
+    }
+    stream.consume(")")
+  }
+
+  private def parsePrimaryKey(table: Table): Unit = {
+    stream.consume("KEY")
+    parseIndexType()
+    var columnName = ""
+    if (stream.canConsume("(")) {
+      stream.consume("(")
+      columnName = stream.consume
+      stream.consume(")")
+    } else {
+      columnName = stream.consume
+    }
+    val column = table.columnWithName(columnName)
+    column.isPk = true
+    parseIndexOption()
+  }
+
+  private def parseKeyPart(): Unit = {
+    stream.consume //column name
+    if (stream.canConsume("(")) {
+      stream.consume //length
+      stream.consume(")")
+    }
+    if (stream.canConsume("ASC") || stream.canConsume("DESC")) {
+      stream.consume
+    }
+  }
+
+  private def parseIndexOption(): Unit = {
+    stream.consume match {
+      case "KEY_BLOCK_SIZE" =>
+        if (stream.canConsume("=")) {
+          stream.consume("=")
+          stream.consume
+        }
+      case "WITH"           =>
+        stream.consume("PARSER")
+        stream.consume
+      case "COMMENT"        => stream.consume
+      case "USING"          => stream.consume
+    }
+  }
+
+  private def parseIndexType(): Unit = {
+    if (stream.canConsume("USING")) {
+      stream.consume("USING")
+      stream.consume
+    }
+  }
+
+  private def parseColumnCreateDefinition(columnName: String, table: Table): Unit = {
+    val columnName = columnName
     val jdbcType = stream.consume
     var length: Int = 0
     if (stream.canConsume("(")) {
@@ -95,10 +230,19 @@ class MysqlDdlParser {
       stream.consume(")")
     }
 
-    if (stream.canConsume("CONSTRAINT")) {
-      stream.consume("CONSTRAINT")
-      //symbol, ignore this
-      stream.consume
+    //todo: parse column definition
+    stream.consume match {
+      case "NOT" =>
+      case "NULL" =>
+      case "DEFAULT" =>
+      case "AUTO_INCREMENT" =>
+      case "UNIQUE" =>
+      case "PRIMARY" =>
+      case "KEY" =>
+      case "COMMENT" =>
+      case "COLUMN_FORMAT" =>
+      case "STORAGE" =>
+      case "REFERENCES" => parseReferenceDefinition()
     }
 
     var isPk = false
@@ -133,5 +277,36 @@ class MysqlDdlParser {
       stream.consume("AUTO_INCREMENT")
       isAutoIncrement = true
     }
+
+    if (stream.canConsume("CONSTRAINT")) {
+      stream.consume("CONSTRAINT")
+      //symbol, ignore this
+      stream.consume
+    }
+  }
+
+  private def parseReferenceDefinition(): Unit = {
+    stream.consume
+    stream.consume("(")
+    parseKeyPart()
+    while (stream.canConsume(",")) {
+      stream.consume(",")
+      parseKeyPart()
+    }
+    stream.consume(")")
+    stream.consume match {
+      case "MATCH" => stream.consume
+      case "ON" => {
+        stream.consume
+        parseReferenceOption()
+      }
+    }
+  }
+
+  private def parseReferenceOption(): Unit = {
+    if (stream.canConsume("SET") || stream.canConsume("NO")) {
+      stream.consume
+    }
+    stream.consume
   }
 }
