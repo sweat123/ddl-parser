@@ -29,7 +29,7 @@ class MysqlTokenStream {
   @throws[IOException]
   def consume: String = {
     val token = currentToken
-    nextToken
+    currentToken = nextToken
     token
   }
 
@@ -38,55 +38,67 @@ class MysqlTokenStream {
   def nextToken = {
     var token: String = null
     var foundToken = false
-    breakable {
-      while (!foundToken && reader.hasNext) {
-        val nextChar = reader.next
-        nextChar match {
-          case ' '  =>
-          case '\t' =>
-          case '\r' =>
-          case '\n' =>
-            //ignore these character
-            reader.commit()
-          case '#'  =>
-            // comment, we need read next character util '\n' or '\r'
+    while (!foundToken && reader.hasNext) {
+      val nextChar = reader.next
+      nextChar match {
+        case ' '  =>
+          reader.commit()
+        case '\t' =>
+          reader.commit()
+        case '\r' =>
+          reader.commit()
+        case '\n' =>
+          //ignore these character
+          reader.commit()
+        case '#'  =>
+          // comment, we need read next character util '\n' or '\r'
+          readComment()
+        case '('  =>
+          token = String.valueOf(nextChar)
+          foundToken = true
+          reader.commit()
+        case ')'  =>
+          token = String.valueOf(nextChar)
+          foundToken = true
+          reader.commit()
+        case ','  =>
+          token = String.valueOf(nextChar)
+          foundToken = true
+          reader.commit()
+        case '`'  =>
+          token = readValueWithQuote(nextChar)
+          foundToken = true
+        case '\'' =>
+          token = readValueWithQuote(nextChar)
+          foundToken = true
+        case '"'  =>
+          token = readValueWithQuote(nextChar)
+          foundToken = true
+        case '-'  =>
+          reader.commit()
+          if (reader.next == '-') {
             readComment()
-          case '('  =>
-          case ')'  =>
-          case ','  =>
-            token = String.valueOf(nextChar)
+          } else {
             foundToken = true
-            reader.commit()
-          case '`'  =>
-          case '\'' =>
-          case '"'  =>
-            token = readValueWithQuote(nextChar)
-            foundToken = true
-          case '-'  =>
-            reader.commit()
-            if (reader.next == '-') {
-              readComment()
+            token = currentToken
+          }
+        case _    =>
+          //word
+          val sb = new StringBuilder()
+          sb.append(nextChar)
+          reader.commit()
+          var finished = false
+          while (reader.hasNext && !finished) {
+            val next = reader.next
+            if (Character.isWhitespace(next) || isKeyCharacter(next)) {
+              finished = true
             } else {
-              foundToken = true
-              token = currentToken
+              sb.append(next)
+              reader.commit()
             }
-          case _    =>
-            //word
-            val sb = new StringBuilder
-            sb.append(currentToken)
-            reader.commit()
-            breakable {
-              while (reader.hasNext) {
-                val next = reader.next
-                if (Character.isWhitespace(next) || isKeyCharacter(next)) {
-                  break
-                }
-                reader.commit()
-              }
-            }
-            token = sb.toString
-            foundToken = true
-        }
+          }
+          token = sb.toString
+          foundToken = true
       }
     }
     token

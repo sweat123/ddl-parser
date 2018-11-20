@@ -1,6 +1,8 @@
 package com.laomei.ddl.parser
 
-import org.slf4j.{Logger, LoggerFactory}
+import java.sql.JDBCType
+import java.util.Objects
+
 import scala.util.control.Breaks._
 
 /**
@@ -8,11 +10,9 @@ import scala.util.control.Breaks._
   */
 class MysqlDdlParser {
 
-  val logger: Logger = LoggerFactory.getLogger(getClass)
+  private var stream: MysqlTokenStream = _
 
-  var stream: MysqlTokenStream = _
-
-  var tables: Tables = _
+  private var tables: Tables = _
 
   /**
     * parse ddl
@@ -183,7 +183,7 @@ class MysqlDdlParser {
       columnName = stream.consume
     }
     val column = table.columnWithName(columnName)
-    column.isPk = true
+    column.isPk(true)
     parseIndexOption()
   }
 
@@ -221,7 +221,7 @@ class MysqlDdlParser {
   }
 
   private def parseColumnCreateDefinition(columnName: String, table: Table): Unit = {
-    val columnName = columnName
+    val column = new Column
     val jdbcType = stream.consume
     var length: Int = 0
     if (stream.canConsume("(")) {
@@ -229,59 +229,50 @@ class MysqlDdlParser {
       length = stream.consume.toInt
       stream.consume(")")
     }
+    column.name(columnName)
+    column.jdbcType(JDBCType.valueOf(jdbcType))
+    column.length(length)
+    table.addColumn(column)
+    parseColumnDefinitionDetail(column)
+  }
 
-    //todo: parse column definition
-    stream.consume match {
+  private def parseColumnDefinitionDetail(column: Column): Unit = {
+    val token = stream.consume
+    token match {
       case "NOT" =>
+        stream.consume("NULL")
+        column.isOptional(true)
+        parseColumnDefinitionDetail(column)
       case "NULL" =>
+        column.isOptional(false)
+        parseColumnDefinitionDetail(column)
       case "DEFAULT" =>
+        parseDefaultValue(column)
       case "AUTO_INCREMENT" =>
+        column.isAutoIncremented(true)
+        parseColumnDefinitionDetail(column)
       case "UNIQUE" =>
+        if (stream.canConsume("KEY")) {
+          stream.consume("KEY")
+        }
+        parseColumnDefinitionDetail(column)
       case "PRIMARY" =>
+        stream.consume("KEY")
+        column.isPk(true)
+        parseColumnDefinitionDetail(column)
       case "KEY" =>
+        column.isPk(true)
+        parseColumnDefinitionDetail(column)
       case "COMMENT" =>
       case "COLUMN_FORMAT" =>
+        stream.consume
+        parseColumnDefinitionDetail(column)
       case "STORAGE" =>
+        stream.consume
       case "REFERENCES" => parseReferenceDefinition()
-    }
-
-    var isPk = false
-    /* index */
-    if (stream.canConsume("PRIMARY")) {
-      stream.consume("PRIMARY")
-      stream.consume("KEY")
-      isPk = true
-    } else if (stream.canConsume("FOREIGN")) {
-      // only ignore these
-      stream.consume("FOREIGN")
-      stream.consume("KEY")
-    }
-
-    var optional: Boolean = true
-    if (stream.canConsume("NULL")) {
-      stream.consume("NULL")
-    } else if (stream.canConsume("NOT")) {
-      stream.consume("NOT")
-      stream.consume("NULL")
-      optional = false
-    }
-    var hasDefaultValue: Boolean = false
-    var defaultValue: String = _
-    if (stream.canConsume("DEFAULT")) {
-      stream.consume("DEFAULT")
-      defaultValue = stream.consume
-      hasDefaultValue = true
-    }
-    var isAutoIncrement: Boolean = false
-    if (stream.canConsume("AUTO_INCREMENT")) {
-      stream.consume("AUTO_INCREMENT")
-      isAutoIncrement = true
-    }
-
-    if (stream.canConsume("CONSTRAINT")) {
-      stream.consume("CONSTRAINT")
-      //symbol, ignore this
-      stream.consume
+      case "," => {
+        //ignore
+      }
     }
   }
 
@@ -308,5 +299,36 @@ class MysqlDdlParser {
       stream.consume
     }
     stream.consume
+  }
+
+  private def parseDefaultValue(column: Column): Unit = {
+    if (stream.canConsume("'")) {
+      parseDefaultValue(column, "'")
+    } else if (stream.canConsume("\"")) {
+      parseDefaultValue(column, "\"")
+    } else {
+      column.defaultValue(stream.consume)
+    }
+  }
+
+  private def parseDefaultValue(column: Column, str: String): Unit = {
+    stream.consume(str)
+    if (stream.canConsume(str)) {
+      stream.consume(str)
+      column.defaultValue("")
+      return
+    }
+    val sb = new StringBuilder
+    sb.append(stream.consume)
+    breakable {
+      while (true) {
+        val token = stream.consume
+        if (Objects.equals(token, str)) {
+          break
+        }
+        sb.append(" ").append(token)
+      }
+    }
+    column.defaultValue(sb.toString())
   }
 }

@@ -1,5 +1,7 @@
 package com.laomei.ddl.parser
 
+import java.sql.JDBCType
+
 /**
   * @author laomei on 2018/11/6 22:41
   */
@@ -7,7 +9,7 @@ class Column {
 
   var name: String = _
 
-  var jdbcType: Int = _
+  var jdbcType: JDBCType = _
 
   var jdbcTypeName: String = _
 
@@ -28,7 +30,7 @@ class Column {
     this
   }
 
-  def jdbcType(jdbcType: Int): Column = {
+  def jdbcType(jdbcType: JDBCType): Column = {
     this.jdbcType = jdbcType
     this
   }
