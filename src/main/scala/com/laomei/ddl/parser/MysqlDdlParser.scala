@@ -3,8 +3,6 @@ package com.laomei.ddl.parser
 import java.sql.JDBCType
 import java.util.Objects
 
-import scala.util.control.Breaks._
-
 /**
   * @author laomei on 2018/11/3 13:53
   */
@@ -78,15 +76,14 @@ class MysqlDdlParser {
 
   private def parseCreateContent(table: Table): Unit = {
     stream.consume("(")
-    parseColumnDefinition(table)
-    while (stream.canConsume(",")) {
-      stream.consume(",")
-      parseColumnDefinition(table)
+    var hasNext = parseColumnDefinition(table)
+    while (hasNext) {
+      hasNext = parseColumnDefinition(table)
     }
     stream.consume(")")
   }
 
-  private def parseColumnDefinition(table: Table): Unit = {
+  private def parseColumnDefinition(table: Table): Boolean = {
     stream.consume match {
       case "PRIMARY"    => parsePrimaryKey(table)
       case "FOREIGN"    => parseForeignKey(table)
@@ -101,7 +98,7 @@ class MysqlDdlParser {
     }
   }
 
-  private def parseSpatialOrFullText(table: Table): Unit = {
+  private def parseSpatialOrFullText(table: Table): Boolean = {
     stream.consume match {
       case "INDEX" => parseIndex()
       case "KEY"   => parseIndex()
@@ -111,13 +108,14 @@ class MysqlDdlParser {
   /**
     * maybe parse failed
     */
-  private def parseCheck(table: Table): Unit = {
+  private def parseCheck(table: Table): Boolean = {
     stream.consume("(")
     stream.consume
     stream.consume(")")
+    parseHashNext()
   }
 
-  private def parseConstraint(table: Table): Unit = {
+  private def parseConstraint(table: Table): Boolean = {
     stream.consume match {
       case "PRIMARY" => parsePrimaryKey(table)
       case "UNIQUE"  => parseUniqueIndex(table)
@@ -125,14 +123,14 @@ class MysqlDdlParser {
     }
   }
 
-  private def parseUniqueIndex(table: Table): Unit = {
+  private def parseUniqueIndex(table: Table): Boolean = {
     if (stream.canConsume("INDEX") || stream.canConsume("KEY")) {
       stream.consume
     }
     parseIndex()
   }
 
-  private def parseIndex(): Unit = {
+  private def parseIndex(): Boolean = {
     stream.consume //index name
     if (stream.canConsume("USING")) {
       stream.consume("USING")
@@ -146,9 +144,10 @@ class MysqlDdlParser {
     }
     stream.consume(")")
     parseIndexOption()
+    parseHashNext()
   }
 
-  private def parseForeignKey(table: Table): Unit = {
+  private def parseForeignKey(table: Table): Boolean = {
     stream.consume("KEY")
     if (!stream.canConsume("(")) {
       stream.consume  //index name
@@ -169,9 +168,10 @@ class MysqlDdlParser {
       parseKeyPart()
     }
     stream.consume(")")
+    parseHashNext()
   }
 
-  private def parsePrimaryKey(table: Table): Unit = {
+  private def parsePrimaryKey(table: Table): Boolean = {
     stream.consume("KEY")
     parseIndexType()
     var columnName = ""
@@ -185,6 +185,7 @@ class MysqlDdlParser {
     val column = table.columnWithName(columnName)
     column.isPk(true)
     parseIndexOption()
+    parseHashNext()
   }
 
   private def parseKeyPart(): Unit = {
@@ -220,31 +221,26 @@ class MysqlDdlParser {
     }
   }
 
-  private def parseColumnCreateDefinition(columnName: String, table: Table): Unit = {
+  private def parseColumnCreateDefinition(columnName: String, table: Table): Boolean = {
     val column = new Column
-    val jdbcType = stream.consume
-    var length: Int = 0
-    if (stream.canConsume("(")) {
-      stream.consume("(")
-      length = stream.consume.toInt
-      stream.consume(")")
-    }
     column.name(columnName)
-    column.jdbcType(JDBCType.valueOf(jdbcType))
-    column.length(length)
+    parseColumnType(column)
     table.addColumn(column)
+    if (stream.canConsume(")")) {
+      return false
+    }
     parseColumnDefinitionDetail(column)
   }
 
-  private def parseColumnDefinitionDetail(column: Column): Unit = {
+  private def parseColumnDefinitionDetail(column: Column): Boolean = {
     val token = stream.consume
     token match {
       case "NOT" =>
         stream.consume("NULL")
-        column.isOptional(true)
+        column.isOptional(false)
         parseColumnDefinitionDetail(column)
       case "NULL" =>
-        column.isOptional(false)
+        column.isOptional(true)
         parseColumnDefinitionDetail(column)
       case "DEFAULT" =>
         parseDefaultValue(column)
@@ -264,19 +260,21 @@ class MysqlDdlParser {
         column.isPk(true)
         parseColumnDefinitionDetail(column)
       case "COMMENT" =>
+        parseComment(column)
+        parseColumnDefinitionDetail(column)
       case "COLUMN_FORMAT" =>
         stream.consume
         parseColumnDefinitionDetail(column)
       case "STORAGE" =>
         stream.consume
+        parseHashNext()
       case "REFERENCES" => parseReferenceDefinition()
-      case "," => {
-        //ignore
-      }
+      case "," => true
+      case _ => parseHashNext()
     }
   }
 
-  private def parseReferenceDefinition(): Unit = {
+  private def parseReferenceDefinition(): Boolean = {
     stream.consume
     stream.consume("(")
     parseKeyPart()
@@ -286,7 +284,9 @@ class MysqlDdlParser {
     }
     stream.consume(")")
     stream.consume match {
-      case "MATCH" => stream.consume
+      case "MATCH" =>
+        stream.consume
+        parseHashNext()
       case "ON" => {
         stream.consume
         parseReferenceOption()
@@ -294,21 +294,100 @@ class MysqlDdlParser {
     }
   }
 
-  private def parseReferenceOption(): Unit = {
+  private def parseReferenceOption(): Boolean = {
     if (stream.canConsume("SET") || stream.canConsume("NO")) {
       stream.consume
     }
     stream.consume
+    parseHashNext()
   }
 
-  private def parseDefaultValue(column: Column): Unit = {
+  private def parseColumnType(column: Column): Unit = {
+    val dateType = stream.consume
+    column.dateType(dateType)
+    dateType match {
+      case "DECIMAL" => parseDecimalType(column)
+      case "DEC"     => parseDecimalType(column)
+      case "NUMERIC" => parseDecimalType(column)
+      case "DOUBLE"  => parseDoubleType(column)
+      case "FLOAT"   => parseDoubleType(column)
+      case "ENUM"    => parseEnumType(column)
+      case "SET"     => parseSetType(column)
+      case _         => parseType(column)
+    }
+  }
+
+  private def parseDecimalType(column: Column): Unit = {
+    val columnLength = new ColumnLength
+    if (stream.canConsume("(")) {
+      stream.consume("(")
+      columnLength.length = stream.consume.toInt
+      if (stream.canConsume(",")) {
+        stream.consume(",")
+        columnLength.digits = stream.consume.toInt
+        columnLength.hasDigits = true
+      }
+      stream.consume(")")
+    }
+    column.length = columnLength
+    if (stream.canConsume("UNSIGNED")) {
+      stream.consume("UNSIGNED")
+    }
+  }
+
+  private def parseDoubleType(column: Column): Unit = {
+    val columnLength = new ColumnLength
+    if (stream.canConsume("(")) {
+      stream.consume("(")
+      columnLength.length = stream.consume.toInt
+      columnLength.hasDigits = true
+      stream.consume(",")
+      columnLength.digits = stream.consume.toInt
+      stream.consume(")")
+    }
+    column.length = columnLength
+    if (stream.canConsume("UNSIGNED")) {
+      stream.consume("UNSIGNED")
+    }
+  }
+
+  private def parseEnumType(column: Column): Unit = {
+    parseMultipleValues(column)
+  }
+
+  private def parseSetType(column: Column): Unit = {
+    parseMultipleValues(column)
+  }
+
+  private def parseType(column: Column): Unit = {
+    val columnLength = new ColumnLength
+    columnLength.length = 0
+    if (stream.canConsume("(")) {
+      stream.consume("(")
+      val length = stream.consume
+      stream.consume(")")
+      columnLength.length = length.toInt
+    }
+    column.length(columnLength)
+    if (stream.canConsume("UNSIGNED")) {
+      stream.consume("UNSIGNED")
+    }
+  }
+
+  private def parseDefaultValue(column: Column): Boolean = {
     if (stream.canConsume("'")) {
       parseDefaultValue(column, "'")
     } else if (stream.canConsume("\"")) {
       parseDefaultValue(column, "\"")
     } else {
-      column.defaultValue(stream.consume)
+      var value = stream.consume
+      if (stream.canConsume(".")) {
+        value += stream.consume
+        value += stream.consume
+      }
+      column.defaultValue(value)
     }
+    parseHashNext()
   }
 
   private def parseDefaultValue(column: Column, str: String): Unit = {
@@ -320,15 +399,43 @@ class MysqlDdlParser {
     }
     val sb = new StringBuilder
     sb.append(stream.consume)
-    breakable {
-      while (true) {
-        val token = stream.consume
-        if (Objects.equals(token, str)) {
-          break
-        }
+    var finished = false
+    while (!finished) {
+      val token = stream.consume
+      if (Objects.equals(token, str)) {
+        finished = true
+      } else {
         sb.append(" ").append(token)
       }
     }
     column.defaultValue(sb.toString())
+  }
+
+  private def parseComment(column: Column): Boolean = {
+    stream.consume
+    parseHashNext()
+  }
+
+  private def parseMultipleValues(column: Column): Unit = {
+    stream.consume("(")
+    stream.consume
+    var end = false
+    while (!end) {
+      if (!stream.canConsume(",")) {
+        end = true
+      } else {
+        stream.consume(",")
+        stream.consume
+      }
+    }
+    stream.consume(")")
+  }
+
+  private def parseHashNext(): Boolean = {
+    if (stream.canConsume(",")) {
+      stream.consume(",")
+      return true
+    }
+    false
   }
 }

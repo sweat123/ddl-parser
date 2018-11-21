@@ -1,7 +1,5 @@
 package com.laomei.ddl.parser
 
-import java.sql.JDBCType
-
 /**
   * @author laomei on 2018/11/6 22:41
   */
@@ -9,11 +7,9 @@ class Column {
 
   var name: String = _
 
-  var jdbcType: JDBCType = _
+  var dateType: String = _
 
-  var jdbcTypeName: String = _
-
-  var length: Int = _
+  var length: ColumnLength = ColumnLength.defaultColumnLength
 
   var isPk: Boolean = false
 
@@ -30,17 +26,12 @@ class Column {
     this
   }
 
-  def jdbcType(jdbcType: JDBCType): Column = {
-    this.jdbcType = jdbcType
+  def dateType(dateType: String): Column = {
+    this.dateType = dateType
     this
   }
 
-  def jdbcTypeName(jdbcTypeName: String): Column = {
-    this.jdbcTypeName = jdbcTypeName
-    this
-  }
-
-  def length(length: Int): Column = {
+  def length(length: ColumnLength): Column = {
     this.length = length
     this
   }
@@ -76,8 +67,7 @@ class Column {
     obj match {
       case that: Column =>
         this.name.equalsIgnoreCase(that.name)&&
-          this.jdbcType.equals(that.jdbcType)&&
-          this.jdbcTypeName.equalsIgnoreCase(that.jdbcTypeName)&&
+          this.dateType.equals(that.dateType)&&
           this.length.equals(that.length)&&
           this.isPk.equals(that.isPk)&&
           this.isOptional.equals(that.isOptional)&&
@@ -90,12 +80,12 @@ class Column {
 
   override def toString: String = {
     val sb = new StringBuilder
-    sb.append(" ").append(jdbcTypeName)
-    if (length >= 0) {
-      sb.append('(').append(length)
-      sb.append(')')
+    sb.append(name).append(" ").append(dateType)
+    if (length.hasDigits || length.length > 0) {
+      sb.append(length)
     }
     if (!isOptional) sb.append(" NOT NULL")
+    else sb.append(" NULL")
     if (isAutoIncremented) sb.append(" AUTO_INCREMENTED")
     if (hasDefaultValue && defaultValue == null) {
       sb.append(" DEFAULT VALUE NULL")
@@ -107,4 +97,24 @@ class Column {
     }
     sb.toString()
   }
+}
+
+class ColumnLength {
+  var hasDigits: Boolean = false
+  var length: Int = 0
+  var digits: Int = 0
+
+  override def toString: String = {
+    val sb = new StringBuilder
+    sb.append("(").append(length)
+    if (hasDigits) {
+      sb.append(",").append(digits)
+    }
+    sb.append(")")
+    sb.toString()
+  }
+}
+
+object ColumnLength {
+  val defaultColumnLength = new ColumnLength
 }

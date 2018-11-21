@@ -57,6 +57,10 @@ class MysqlTokenStream {
           token = String.valueOf(nextChar)
           foundToken = true
           reader.commit()
+        case '.'  =>
+          token = String.valueOf(nextChar)
+          foundToken = true
+          reader.commit()
         case ')'  =>
           token = String.valueOf(nextChar)
           foundToken = true
