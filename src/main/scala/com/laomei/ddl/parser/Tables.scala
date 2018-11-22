@@ -10,7 +10,7 @@ class Tables(val schemaName: String) {
   private val tables: util.Map[String, Table] = new util.HashMap[String, Table]()
 
   def addTable(table: Table): Tables = {
-    tables.put(table.tableName.toLowerCase, table)
+    tables.put(table.tableName, table)
     this
   }
 
@@ -25,6 +25,10 @@ class Tables(val schemaName: String) {
   }
 
   def getTableByName(name: String): Table = {
-    tables.get(name.toLowerCase)
+    tables.get(name)
+  }
+
+  def dropTable(table: String): Table = {
+    tables.remove(table)
   }
 }

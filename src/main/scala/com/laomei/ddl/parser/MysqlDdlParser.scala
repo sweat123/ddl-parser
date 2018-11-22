@@ -1,6 +1,5 @@
 package com.laomei.ddl.parser
 
-import java.sql.JDBCType
 import java.util.Objects
 
 /**
@@ -44,7 +43,29 @@ class MysqlDdlParser {
 
   private def parseDropDdl(): Unit = {
     stream.consume("DROP")
-
+    if (stream.canConsume("TEMPORARY")) {
+      stream.consume("TEMPORARY")
+    }
+    stream.consume("TABLE")
+    if (stream.canConsume("IF")) {
+      stream.consume("IF")
+      stream.consume("EXISTS")
+    }
+    var tableName = stream.consume
+    tables.dropTable(tableName)
+    var canDrop = true
+    while (canDrop) {
+      if (stream.canConsume(",")) {
+        stream.consume(",")
+        tableName = stream.consume
+        tables.dropTable(tableName)
+      } else {
+        canDrop = false
+      }
+    }
+    if (stream.canConsume("RESTRICT") | stream.canConsume("CASCADE")) {
+      stream.consume
+    }
   }
 
   private def parseCreateDdl(): Unit = {
