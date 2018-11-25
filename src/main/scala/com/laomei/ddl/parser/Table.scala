@@ -35,4 +35,21 @@ class Table(val tableName: String) {
     columns.foreach(addColumn)
     this
   }
+
+  def dropColumn(columnName: String): Boolean = {
+    if (!hasColumnWithName(columnName)) {
+      return false
+    }
+    sortedColumns.remove(columnName)
+    true
+  }
+
+  def dropPrimaryKey(): Boolean = {
+    val primaryKeyColumn = columns.filter(_.isPk).head
+    if (primaryKeyColumn == null) {
+      return false
+    }
+    sortedColumns.remove(primaryKeyColumn)
+    true
+  }
 }

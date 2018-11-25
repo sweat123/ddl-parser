@@ -33,12 +33,15 @@ class MysqlDdlParser {
   }
 
   private def parseUnknownDdl(): Unit = {
-
+    throw new UnsupportedOperationException("Unknown ddl")
   }
 
   private def parseAlterDdl(): Unit = {
     stream.consume("ALTER")
-
+    stream.consume("TABLE")
+    val tableName = stream.consume
+    val table = tables.getTableByName(tableName)
+    parseAlterSpecification(table)
   }
 
   private def parseDropDdl(): Unit = {
@@ -68,11 +71,201 @@ class MysqlDdlParser {
     }
   }
 
+  private def parseAlterSpecification(table: Table): Boolean = {
+    val token = stream.consume
+    token match {
+      case "ADD"                =>
+        //todo parse add
+      case "CHANGE"             =>
+        //todo parse change
+      case "MODIFY"             =>
+        //todo update column definition
+      case "ALGORITHM"          => parseTableOptional()
+      case "ALTER"              =>
+        if (stream.canConsume("COLUMN")) {
+          stream.consume("COLUMN")
+        }
+        stream.consume
+        if (stream.canConsume("SET")) {
+          stream.consume("SET")
+          stream.consume("DEFAULT")
+          stream.consume
+        } else {
+          stream.consume("DROP")
+          stream.consume("DEFAULT")
+        }
+        parseHashNext()
+      case "CONVERT"            =>
+        stream.consume("TO")
+        stream.consume("CHARACTER")
+        stream.consume("SET")
+        stream.consume
+        if (stream.canConsume("COLLATE ")) {
+          stream.consume("COLLATE")
+          stream.consume
+        }
+        parseHashNext()
+      case "DISABLE"            =>
+        stream.consume
+        parseHashNext()
+      case "ENABLE"             =>
+        stream.consume
+        parseHashNext()
+      case "DISCARD"            =>
+        stream.consume
+        parseHashNext()
+      case "IMPORT"             =>
+        stream.consume
+        parseHashNext()
+      case "DROP"               => parseAlertDrop(table)
+      case "FORCE"              => parseHashNext()
+      case "LOCK"               => parseTableOptional()
+      case "ORDER"              =>
+        stream.consume("BY")
+        stream.consume
+        var end = false
+        while (!end) {
+          if (stream.canConsume(",")) {
+            stream.consume(",")
+            stream.consume
+          } else {
+            end = true
+          }
+        }
+        parseHashNext()
+      case "RENAME"             =>
+        if (stream.canConsume("TO") || stream.canConsume("AS")) {
+          stream.consume
+          stream.consume
+        } else {
+          stream.consume
+          stream.consume("TO")
+          stream.consume
+        }
+        parseHashNext()
+      case "WITHOUT"            =>
+        stream.consume
+        parseHashNext()
+      case "WITH"               =>
+        stream.consume
+        parseHashNext()
+      case "AUTO_INCREMENT"     => parseTableOptional()
+      case "AVG_ROW_LENGTH"     => parseTableOptional()
+      case "CHARACTER"          =>
+        stream.consume("SET")
+        if (stream.canConsume("=")) {
+          stream.consume("=")
+        }
+        stream.consume
+        if (stream.canConsume("COLLATE")) {
+          stream.consume("COLLATE")
+          if (stream.canConsume("=")) {
+            stream.consume("=")
+          }
+          stream.consume
+        }
+        parseHashNext()
+      case "CHECKSUM"           => parseTableOptional()
+      case "COLLATE"            => parseTableOptional()
+      case "COMMENT"            => parseTableOptional()
+      case "COMPRESSION"        => parseTableOptional()
+      case "CONNECTION"         => parseTableOptional()
+      case "DATA"               =>
+        stream.consume("DIRECTORY")
+        parseTableOptional()
+      case "INDEX"              =>
+        stream.consume("DIRECTORY")
+        parseTableOptional()
+      case "DELAY_KEY_WRITE"    => parseTableOptional()
+      case "ENCRYPTION"         => parseTableOptional()
+      case "ENGINE"             => parseTableOptional()
+      case "INSERT_METHOD"      => parseTableOptional()
+      case "KEY_BLOCK_SIZE"     => parseTableOptional()
+      case "MAX_ROWS"           => parseTableOptional()
+      case "MIN_ROWS"           => parseTableOptional()
+      case "PACK_KEYS"          => parseTableOptional()
+      case "PASSWORD"           => parseTableOptional()
+      case "ROW_FORMAT"         => parseTableOptional()
+      case "STATS_AUTO_RECALC"  => parseTableOptional()
+      case "STATS_PERSISTENT"   => parseTableOptional()
+      case "STATS_SAMPLE_PAGES" => parseTableOptional()
+      case "TABLESPACE"         =>
+        stream.consume
+        if (stream.canConsume("STORAGE")) {
+          stream.consume
+          stream.consume
+        }
+        parseHashNext()
+      case "UNION"              =>
+        stream.consume
+        var end = false
+        while (!end) {
+          if (stream.canConsume(",")) {
+            stream.consume
+            stream.consume
+          } else {
+            end = true
+          }
+        }
+        parseHashNext()
+      case "DEFAULT"            =>
+        stream.consume match {
+          case "CHARACTER" => {
+            stream.consume("SET")
+            if (stream.canConsume("=")) {
+              stream.consume("=")
+            }
+            stream.consume
+            if (stream.canConsume("COLLATE")) {
+              stream.consume("COLLATE")
+              if (stream.canConsume("=")) {
+                stream.consume("=")
+              }
+              stream.consume
+            }
+            parseHashNext()
+          }
+          case "COLLATE"        => parseTableOptional()
+        }
+      case _                    => throw new UnsupportedOperationException("Not support operation")
+    }
+  }
+
   private def parseCreateDdl(): Unit = {
     stream.consume("CREATE")
     if (stream.canConsume("TABLE")) {
       parseCreateTable()
     }
+  }
+
+  private def parseAlertDrop(table: Table): Boolean = {
+    if (stream.canConsume("PRIMARY")) {
+      stream.consume("PRIMARY")
+      stream.consume("KEY")
+      table.dropPrimaryKey()
+    } else if (stream.canConsume("FOREIGN")) {
+      stream.consume("FOREIGN")
+      stream.consume("KEY")
+      stream.consume
+    } else if (stream.canConsume("INDEX") || stream.canConsume("KEY")) {
+      stream.consume
+      stream.consume
+    } else {
+      if (stream.canConsume("COLUMN")) {
+        stream.consume("COLUMN")
+      }
+      val columnName = stream.consume
+      table.dropColumn(columnName)
+    }
+    parseHashNext()
+  }
+
+  private def parseTableOptional(): Boolean = {
+    if (stream.canConsume("=")) {
+      stream.consume("=")
+    }
+    stream.consume
+    parseHashNext()
   }
 
   private def parseCreateTable(): Unit = {
