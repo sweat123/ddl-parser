@@ -41,7 +41,10 @@ class MysqlDdlParser {
     stream.consume("TABLE")
     val tableName = stream.consume
     val table = tables.getTableByName(tableName)
-    parseAlterSpecification(table)
+    var hasNext = parseAlterSpecification(table)
+    while (hasNext) {
+      hasNext = parseAlterSpecification(table)
+    }
   }
 
   private def parseDropDdl(): Unit = {
@@ -74,8 +77,7 @@ class MysqlDdlParser {
   private def parseAlterSpecification(table: Table): Boolean = {
     val token = stream.consume
     token match {
-      case "ADD"                =>
-        //todo parse add
+      case "ADD"                => parseAlterAdd(table)
       case "CHANGE"             =>
         //todo parse change
       case "MODIFY"             =>
@@ -149,6 +151,31 @@ class MysqlDdlParser {
       case "WITH"               =>
         stream.consume
         parseHashNext()
+      case default              => {
+        var (hasNext, isTableOption) = parseTableOptions(default, table)
+        while (isTableOption) {
+          (hasNext, isTableOption) = parseAlterSpecification(table)
+        }
+        hasNext
+      }
+    }
+  }
+
+  private def parseTableOptions(token: String, table: Table): (Boolean, Boolean) = {
+    parseTableOption(token, table)
+    var hasNext = false
+    if (stream.canConsume(",")) {
+      stream.consume(",")
+      hasNext = true
+    }
+    if (isAlterTableOption) {
+      return (hasNext, true)
+    }
+    (hasNext, false)
+  }
+
+  private def parseTableOption(token: String, table: Table): Boolean = {
+    token match {
       case "AUTO_INCREMENT"     => parseTableOptional()
       case "AVG_ROW_LENGTH"     => parseTableOptional()
       case "CHARACTER"          =>
@@ -227,7 +254,6 @@ class MysqlDdlParser {
           }
           case "COLLATE"        => parseTableOptional()
         }
-      case _                    => throw new UnsupportedOperationException("Not support operation")
     }
   }
 
@@ -256,6 +282,179 @@ class MysqlDdlParser {
       }
       val columnName = stream.consume
       table.dropColumn(columnName)
+    }
+    parseHashNext()
+  }
+
+  private def parseAlterAdd(table: Table): Boolean = {
+    if (stream.canConsume("SPATIAL")) {
+      stream.consume
+      parseAlterAddSpatialOrFullTextOrUnique()
+    } else if (stream.canConsume("FULLTEXT")) {
+      stream.consume
+      parseAlterAddSpatialOrFullTextOrUnique()
+    } else if (stream.canConsume("UNIQUE")) {
+      stream.consume
+      parseAlterAddSpatialOrFullTextOrUnique()
+    } else if (stream.canConsume("INDEX") || stream.canConsume("KEY")) {
+      parseAlterAddSpatialOrFullTextOrUnique()
+    } else if (stream.canConsume("PRIMARY")) {
+      parseAlterAddPrimaryKey(table)
+    } else if (stream.canConsume("FOREIGN")) {
+      parseAlterAddForeignKey()
+    } else if (stream.canConsume("CONSTRAINT")) {
+      stream.consume("CONSTRAINT")
+      parseAlterAddConstraint(table)
+    } else {
+      //COLUMN
+      if (stream.canConsume("COLUMN")) {
+        stream.consume("COLUMN")
+      }
+      var (hasNext, isAlter) = parseColumnAndDefinition(table)
+      while (isAlter) {
+        (hasNext, isAlter) = parseColumnAndDefinition(table)
+      }
+      hasNext
+    }
+  }
+
+  private def parseColumnAndDefinition(table: Table): (Boolean, Boolean) = {
+    val columnName = stream.consume
+    val column = new Column
+    column.name(columnName)
+    table.addColumn(column)
+    val hasNext: Boolean = parseColumnDefinition(table)
+    if (stream.canConsume("FIRST")) {
+      stream.consume("FIRST")
+    } else if (stream.canConsume("AFTER")) {
+      stream.consume("AFTER")
+      stream.consume
+    }
+    if (isAlterSpecification) {
+      return (hasNext, true)
+    }
+    (hasNext, false)
+  }
+
+  private def isAlterSpecification: Boolean = {
+    if (
+      stream.canConsume("ADD")
+      || stream.canConsume("ALGORITHM")
+      || stream.canConsume("ALTER")
+      || stream.canConsume("CHANGE")
+      || stream.canConsume("DEFAULT")
+      || stream.canConsume("CHARACTER")
+      || stream.canConsume("CONVERT")
+      || stream.canConsume("DISABLE")
+      || stream.canConsume("ENABLE")
+      || stream.canConsume("DISCARD")
+      || stream.canConsume("IMPORT")
+      || stream.canConsume("DROP")
+      || stream.canConsume("FORCE")
+      || stream.canConsume("MODIFY")
+      || stream.canConsume("LOCK")
+      || stream.canConsume("ORDER")
+      || stream.canConsume("RENAME")
+      || stream.canConsume("WITHOUT")
+      || stream.canConsume("WITH")
+      || isAlterTableOption
+    ) {
+      return true
+    }
+    false
+  }
+
+  private def isAlterTableOption: Boolean = {
+    if (
+      stream.canConsume("AUTO_INCREMENT")
+      || stream.canConsume("AVG_ROW_LENGTH")
+      || stream.canConsume("CHECKSUM")
+      || stream.canConsume("COMMENT")
+      || stream.canConsume("COMPRESSION")
+      || stream.canConsume("CONNECTION")
+      || stream.canConsume("DATA")
+      || stream.canConsume("INDEX")
+      || stream.canConsume("DELAY_KEY_WRITE")
+      || stream.canConsume("ENCRYPTION")
+      || stream.canConsume("ENGINE")
+      || stream.canConsume("INSERT_METHOD")
+      || stream.canConsume("KEY_BLOCK_SIZE")
+      || stream.canConsume("MAX_ROWS")
+      || stream.canConsume("MIN_ROWS")
+      || stream.canConsume("PACK_KEYS")
+      || stream.canConsume("PASSWORD")
+      || stream.canConsume("ROW_FORMAT")
+      || stream.canConsume("STATS_AUTO_RECALC")
+      || stream.canConsume("STATS_PERSISTENT")
+      || stream.canConsume("STATS_SAMPLE_PAGES")
+      || stream.canConsume("TABLESPACE")
+      || stream.canConsume("UNION")
+    ) {
+      return true
+    }
+      false
+  }
+
+  private def parseAlterAddConstraint(table: Table): Boolean = {
+    stream.consume match {
+      case "PRIMARY" => parseAlterAddPrimaryKey(table)
+      case "UNIQUE"  => parseAlterAddSpatialOrFullTextOrUnique()
+      case "FOREIGN" => parseAlterAddForeignKey()
+      case _         => parseAlterAddConstraint(table)
+    }
+  }
+
+  private def parseAlterAddForeignKey(): Boolean = {
+    stream.consume("KEY")
+    stream.consume
+    stream.consume
+    while (stream.canConsume(",")) {
+      stream.consume(",")
+      stream.consume
+    }
+    parseReferenceDefinition()
+  }
+
+  private def parseAlterAddPrimaryKey(table: Table): Boolean = {
+    stream.consume("KEY")
+    if (stream.canConsume("USING")) {
+      parseIndexType()
+    }
+    var columnName = parseKeyPart()
+    table.columnWithName(columnName).isPk(true)
+    while (stream.canConsume(",")) {
+      stream.consume
+      columnName = parseKeyPart()
+      table.columnWithName(columnName).isPk(true)
+    }
+    var end = false
+    while (!end) {
+      if (isIndexOption()) {
+        parseIndexOption()
+      } else {
+        end = true
+      }
+    }
+    parseHashNext()
+  }
+
+  private def parseAlterAddSpatialOrFullTextOrUnique(): Boolean = {
+    if (stream.canConsume("INDEX") || stream.canConsume("KEY")) {
+      stream.consume
+    }
+    stream.consume //index name
+    parseKeyPart()
+    while (stream.canConsume(",")) {
+      stream.consume
+      parseKeyPart()
+    }
+    var end = false
+    while (!end) {
+      if (isIndexOption()) {
+        parseIndexOption()
+      } else {
+        end = true
+      }
     }
     parseHashNext()
   }
@@ -402,8 +601,8 @@ class MysqlDdlParser {
     parseHashNext()
   }
 
-  private def parseKeyPart(): Unit = {
-    stream.consume //column name
+  private def parseKeyPart(): String = {
+    val name = stream.consume //column name
     if (stream.canConsume("(")) {
       stream.consume //length
       stream.consume(")")
@@ -411,6 +610,19 @@ class MysqlDdlParser {
     if (stream.canConsume("ASC") || stream.canConsume("DESC")) {
       stream.consume
     }
+    name
+  }
+
+  private def isIndexOption(): Boolean = {
+    if (
+      stream.canConsume("KEY_BLOCK_SIZE")
+        || stream.canConsume("WITH")
+        || stream.canConsume("COMMENT")
+        || stream.canConsume("USING")
+    ) {
+      return true
+    }
+    false
   }
 
   private def parseIndexOption(): Unit = {
