@@ -93,8 +93,30 @@ class DdlParserTest extends {
     val dropTable = "DROP TABLE DATE_TIME_TABLE"
     ddlParser.parse(dropTable, tables)
     val tableSize = tables.getTables.size
-    assertEquals(tableSize, 1)
+    assertEquals(1, tableSize)
     val tableName = tables.getTables.head.tableName
-    assertEquals(tableName, "NUMERIC_TABLE")
+    assertEquals("NUMERIC_TABLE", tableName)
+  }
+
+  val ALTER_TABLE1 = "ALTER TABLE `NUMERIC_TABLE` MODIFY COLUMN `A` VARCHAR(255) NOT NULL COMMENT 'hello'"
+  val ALTER_TABLE2 = "ALTER TABLE NUMERIC_TABLE CHANGE COLUMN `A` `A_NEW` TINYINT NOT NULL COMMENT 'hello' FIRST;"
+
+
+  @Test
+  def testAlterTable(): Unit = {
+    val tables = new Tables("test")
+    ddlParser.parse(NUMERIC_SQL, tables)
+    ddlParser.parse(ALTER_TABLE1, tables)
+
+    val table = tables.getTableByName("NUMERIC_TABLE")
+    val columnA = table.columnWithName("A")
+    assertEquals("VARCHAR", columnA.dateType)
+    println(columnA)
+
+    ddlParser.parse(ALTER_TABLE2, tables)
+    val columnANew = table.columnWithName("A_NEW")
+    assertEquals("TINYINT", columnANew.dateType)
+    assertEquals(table.columnWithName("A"), null)
+    println(columnANew)
   }
 }

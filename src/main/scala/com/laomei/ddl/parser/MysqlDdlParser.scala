@@ -30,6 +30,13 @@ class MysqlDdlParser {
     } else {
       parseUnknownDdl()
     }
+    parseSemicolon()
+  }
+
+  private def parseSemicolon(): Unit = {
+    if (stream.canConsume(";")) {
+      stream.consume(";")
+    }
   }
 
   private def parseUnknownDdl(): Unit = {
@@ -78,10 +85,8 @@ class MysqlDdlParser {
     val token = stream.consume
     token match {
       case "ADD"                => parseAlterAdd(table)
-      case "CHANGE"             =>
-        //todo parse change
-      case "MODIFY"             =>
-        //todo update column definition
+      case "CHANGE"             => parseAlterChange(table)
+      case "MODIFY"             => parseAlterModify(table)
       case "ALGORITHM"          => parseTableOptional()
       case "ALTER"              =>
         if (stream.canConsume("COLUMN")) {
@@ -154,7 +159,9 @@ class MysqlDdlParser {
       case default              => {
         var (hasNext, isTableOption) = parseTableOptions(default, table)
         while (isTableOption) {
-          (hasNext, isTableOption) = parseAlterSpecification(table)
+          val (hasNext1, isTableOption1) = parseTableOptions(stream.consume, table)
+          isTableOption = isTableOption1
+          hasNext = hasNext1
         }
         hasNext
       }
@@ -286,6 +293,47 @@ class MysqlDdlParser {
     parseHashNext()
   }
 
+  private def parseAlterModify(table: Table): Boolean = {
+    if (stream.canConsume("COLUMN")) {
+      stream.consume("COLUMN")
+    }
+    val column = stream.consume //column name
+    val hasNext = parseColumnDefinition(column, table)
+    if (hasNext) {
+      return hasNext
+    }
+    if (stream.canConsume("FIRST")) {
+      stream.consume("FIRST")
+    } else if (stream.canConsume("AFTER")) {
+      stream.consume("AFTER")
+      stream.consume
+    }
+    parseHashNext()
+  }
+
+  private def parseAlterChange(table: Table): Boolean = {
+    if (stream.canConsume("COLUMN")) {
+      stream.consume("COLUMN")
+    }
+    val oldColumnName = stream.consume
+    val newColumnName = stream.consume
+    val column = table.columnWithName(oldColumnName)
+    table.dropColumn(oldColumnName)
+    column.name(newColumnName)
+    table.addColumn(column)
+    val hasNext = parseColumnDefinition(newColumnName, table)
+    if (hasNext) {
+      return hasNext
+    }
+    if (stream.canConsume("FIRST")) {
+      stream.consume("FIRST")
+    } else if (stream.canConsume("AFTER")) {
+      stream.consume("AFTER")
+      stream.consume
+    }
+    parseHashNext()
+  }
+
   private def parseAlterAdd(table: Table): Boolean = {
     if (stream.canConsume("SPATIAL")) {
       stream.consume
@@ -312,7 +360,9 @@ class MysqlDdlParser {
       }
       var (hasNext, isAlter) = parseColumnAndDefinition(table)
       while (isAlter) {
-        (hasNext, isAlter) = parseColumnAndDefinition(table)
+        val (hasNext1, isAlter1) = parseColumnAndDefinition(table)
+        isAlter = isAlter1
+        hasNext = hasNext1
       }
       hasNext
     }
@@ -323,7 +373,7 @@ class MysqlDdlParser {
     val column = new Column
     column.name(columnName)
     table.addColumn(column)
-    val hasNext: Boolean = parseColumnDefinition(table)
+    val hasNext: Boolean = parseColumnCreateDefinition(table)
     if (stream.canConsume("FIRST")) {
       stream.consume("FIRST")
     } else if (stream.canConsume("AFTER")) {
@@ -489,14 +539,14 @@ class MysqlDdlParser {
 
   private def parseCreateContent(table: Table): Unit = {
     stream.consume("(")
-    var hasNext = parseColumnDefinition(table)
+    var hasNext = parseColumnCreateDefinition(table)
     while (hasNext) {
-      hasNext = parseColumnDefinition(table)
+      hasNext = parseColumnCreateDefinition(table)
     }
     stream.consume(")")
   }
 
-  private def parseColumnDefinition(table: Table): Boolean = {
+  private def parseColumnCreateDefinition(table: Table): Boolean = {
     stream.consume match {
       case "PRIMARY"    => parsePrimaryKey(table)
       case "FOREIGN"    => parseForeignKey(table)
@@ -507,7 +557,7 @@ class MysqlDdlParser {
       case "SPATIAL"    => parseSpatialOrFullText(table)
       case "FULLTEXT"   => parseSpatialOrFullText(table)
       case "CHECK"      => parseCheck(table)
-      case default      => parseColumnCreateDefinition(default, table)
+      case default      => parseColumnDefinition(default, table)
     }
   }
 
@@ -647,9 +697,12 @@ class MysqlDdlParser {
     }
   }
 
-  private def parseColumnCreateDefinition(columnName: String, table: Table): Boolean = {
-    val column = new Column
-    column.name(columnName)
+  private def parseColumnDefinition(columnName: String, table: Table): Boolean = {
+    var column = table.columnWithName(columnName)
+    if (column == null) {
+      column = new Column
+      column.name(columnName)
+    }
     parseColumnType(column)
     table.addColumn(column)
     if (stream.canConsume(")")) {

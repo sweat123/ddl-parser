@@ -27,7 +27,7 @@ class Table(val tableName: String) {
   }
 
   def addColumn(column: Column): Table = {
-    sortedColumns.put(column.name.toLowerCase, column)
+    sortedColumns.put(column.name, column)
     this
   }
 
