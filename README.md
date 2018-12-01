@@ -1,6 +1,6 @@
-# ddl-parser
+# Mysql ddl-parser
 
-Mysql DDL Parser;
+## 使用方式
 
 1. `git clone repo`
 2. `mvn clean install`
@@ -14,8 +14,6 @@ Mysql DDL Parser;
     <version>1.0-SNAPSHOT</version>
 </dependency>
 ```
-
-使用方式
 
 ```scala
   val NUMERIC_SQL =
@@ -66,3 +64,7 @@ K REAL NOT NULL DEFAULT VALUE 1
 L NUMERIC(3,2) NOT NULL DEFAULT VALUE 1.23
 M DECIMAL(4,3) NOT NULL DEFAULT VALUE 2.321
 ```
+
+## 注意
+
+`mysql 5.7`，不支持`partition`
